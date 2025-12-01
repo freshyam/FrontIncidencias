@@ -2,12 +2,14 @@
 import React, { useState, useEffect } from "react";
 import { gql, useQuery, useMutation } from "@apollo/client";
 import { Plus, MessageSquareText, AlertTriangle } from "lucide-react";
+
 import InventoryTable from "../../components/inventory/InventoryTable";
 import NewProductModal from "../../components/inventory/NewProductModal";
 import AdjustStockModal from "../../components/inventory/AdjustStockModal";
 import AdjustmentModal from "../../components/inventory/Adjustment";
+import EditProductModal from "../../components/inventory/EditProductModal";
 
-
+// 🔹 Queries
 const GET_INVENTORY = gql`
   query GetInventory {
     GetInventory {
@@ -53,7 +55,6 @@ const CREATE_PRODUCTO = gql`
   }
 `;
 
-// 🔹 NUEVA: Ajustar stock
 const AJUSTAR_STOCK_PRODUCTO = gql`
   mutation AjustarStockProducto($input: AjustarStockInput!) {
     AjustarStockProducto(input: $input) {
@@ -63,6 +64,35 @@ const AJUSTAR_STOCK_PRODUCTO = gql`
       status
       stockActual
       stockMinimo
+    }
+  }
+`;
+
+// 🔹 updateProducto (usa args sueltos, como tu resolver)
+const UPDATE_PRODUCTO = gql`
+  mutation UpdateProducto(
+    $id: ID!
+    $descripcion: String
+    $categoria: String
+     $stockActual: Int
+    $stockMinimo: Int
+  ) {
+    updateProducto(
+      id: $id
+      descripcion: $descripcion
+      categoria: $categoria
+      stockActual: $stockActual
+      stockMinimo: $stockMinimo
+    ) {
+      success
+      message
+      producto {
+        id
+        nombre
+        categoria
+        stockActual
+        stockMinimo
+      }
     }
   }
 `;
@@ -84,6 +114,8 @@ const Inventory = () => {
 
   // 🔹 producto seleccionado para ajustar stock
   const [productToAdjust, setProductToAdjust] = useState(null);
+  // 🔹 producto seleccionado para editar
+  const [productToEdit, setProductToEdit] = useState(null);
 
   const {
     data: inventoryData,
@@ -97,13 +129,15 @@ const Inventory = () => {
     error: errorCategories,
   } = useQuery(GET_CATEGORIES);
 
-   const [openAdjustments, setOpenAdjustments] = useState(false);
+  const [openAdjustments, setOpenAdjustments] = useState(false);
 
   const [createCategoria] = useMutation(CREATE_CATEGORIA);
   const [createProducto] = useMutation(CREATE_PRODUCTO);
-  const [ajustarStock, { loading: adjustingStock }] = useMutation(
-    AJUSTAR_STOCK_PRODUCTO
-  );
+  const [ajustarStock, { loading: adjustingStock }] =
+    useMutation(AJUSTAR_STOCK_PRODUCTO);
+
+  const [updateProducto, { loading: updatingProduct }] =
+    useMutation(UPDATE_PRODUCTO);
 
   // Cargar productos
   useEffect(() => {
@@ -187,6 +221,58 @@ const Inventory = () => {
     return null;
   };
 
+  // 🔹 Abrir modal de edición
+  const handleOpenEditModal = (product) => {
+    setProductToEdit(product);
+  };
+
+  // 🔹 Cerrar modal de edición
+  const handleCloseEditModal = () => {
+    setProductToEdit(null);
+  };
+
+  // 🔹 Enviar edición al backend
+  const handleEditProductSubmit = async (formValues) => {
+  const { id, name, category, minStock } = formValues;
+
+  const { data } = await updateProducto({
+    variables: {
+      id,
+      descripcion: name,
+      categoria: category,
+      stockMinimo: Number(minStock),
+    
+    },
+  });
+
+  const response = data?.updateProducto;
+
+  if (response?.success && response.producto) {
+    const api = response.producto;
+
+    const prev = products.find((p) => p.id === api.id);
+
+    const updated = {
+      id: api.id,
+      name: api.nombre,
+      category: api.categoria,
+      
+      stock: prev?.stock ?? api.stockActual,
+      minStock: api.stockMinimo,
+      status: prev?.status ?? api.status ?? 1,
+      location: prev?.location ?? null,
+    };
+
+    setProducts((prevList) =>
+      prevList.map((p) => (p.id === updated.id ? updated : p))
+    );
+
+    return updated;
+  }
+
+  return null;
+};
+
   const lowStockCount = products.filter(
     (p) => p.stock <= p.minStock
   ).length;
@@ -213,8 +299,6 @@ const Inventory = () => {
     console.error("Error al cargar categorías:", errorCategories);
   }
 
- 
-
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       {/* Header */}
@@ -227,31 +311,32 @@ const Inventory = () => {
             Gestiona el stock de equipos y accesorios
           </p>
         </div>
-         
 
-        <button
+        <div className="flex gap-3">
+          <button
             type="button"
             onClick={() => setOpenAdjustments(true)}
             className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-          ><MessageSquareText />
+          >
+            <MessageSquareText />
             Movimiento
           </button>
 
-
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-          disabled={!categories.length}
-          title={
-            categories.length
-              ? ""
-              : "No hay categorías, crea una desde el tab en el modal"
-          }
-        >
-          <Plus className="h-4 w-4" />
-          Agregar Producto
-        </button>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+            disabled={!categories.length}
+            title={
+              categories.length
+                ? ""
+                : "No hay categorías, crea una desde el tab en el modal"
+            }
+          >
+            <Plus className="h-4 w-4" />
+            Agregar Producto
+          </button>
+        </div>
       </div>
 
       {/* Alert stock bajo */}
@@ -264,8 +349,8 @@ const Inventory = () => {
               <span className="font-bold text-amber-700">
                 {lowStockCount}
               </span>{" "}
-              producto{lowStockCount > 1 ? "s" : ""} con stock bajo
-              o crítico
+              producto{lowStockCount > 1 ? "s" : ""} con stock bajo o
+              crítico
             </p>
           </div>
         </div>
@@ -275,6 +360,7 @@ const Inventory = () => {
       <InventoryTable
         products={products}
         onOpenAdjust={handleOpenAdjustModal}
+        onOpenEdit={handleOpenEditModal}
       />
 
       {/* Modal Nuevo producto */}
@@ -295,9 +381,20 @@ const Inventory = () => {
         onSubmit={handleAdjustStockSubmit}
       />
 
+      {/* Modal movimientos */}
       <AdjustmentModal
         open={openAdjustments}
         onClose={() => setOpenAdjustments(false)}
+      />
+
+      {/* Modal Editar producto */}
+      <EditProductModal
+        open={!!productToEdit}
+        product={productToEdit}
+        categories={categories}
+        loading={updatingProduct}
+        onClose={handleCloseEditModal}
+        onSubmit={handleEditProductSubmit}
       />
     </div>
   );

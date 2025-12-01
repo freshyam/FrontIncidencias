@@ -20,7 +20,7 @@ const getStockStatus = (stock, minStock) => {
   };
 };
 
-const InventoryTable = ({ products, onOpenAdjust }) => {
+const InventoryTable = ({ products, onOpenAdjust, onOpenEdit }) => {
   const [search, setSearch] = useState("");
 
   const filteredProducts = useMemo(() => {
@@ -29,9 +29,7 @@ const InventoryTable = ({ products, onOpenAdjust }) => {
     return products.filter((p) =>
       [p.name, p.category, p.location]
         .filter(Boolean)
-        .some((field) =>
-          String(field).toLowerCase().includes(q)
-        )
+        .some((field) => String(field).toLowerCase().includes(q))
     );
   }, [products, search]);
 
@@ -129,15 +127,27 @@ const InventoryTable = ({ products, onOpenAdjust }) => {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onOpenAdjust && onOpenAdjust(product)
-                      }
-                      className="inline-flex items-center rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      Ajustar
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onOpenAdjust && onOpenAdjust(product)
+                        }
+                        className="inline-flex items-center rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        Ajustar
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onOpenEdit && onOpenEdit(product)
+                        }
+                        className="inline-flex items-center rounded-md border border-blue-500 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                      >
+                        Editar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
